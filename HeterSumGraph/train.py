@@ -266,56 +266,83 @@ def run_eval(model, loader, valset, hps, best_loss, best_F, non_descent_cnt, sav
     model.eval()
 
     iter_start_time = time.time()
-
+    # Tester ???
+    """
+        Graph: 
+            Graph(num_nodes=1872, num_edges=21680,
+                ndata_schemes={
+                    'unit': Scheme(shape=(), dtype=torch.float32), 
+                    'id': Scheme(shape=(), dtype=torch.int64), 
+                    'dtype': Scheme(shape=(), dtype=torch.float32), 
+                    'words': Scheme(shape=(100,), dtype=torch.int64), 
+                    'position': Scheme(shape=(1,), dtype=torch.int64), 
+                    'label': Scheme(shape=(50,), dtype=torch.int64)}
+                edata_schemes={
+                    'tffrac': Scheme(shape=(), dtype=torch.int64), 
+                    'dtype': Scheme(shape=(), dtype=torch.float32)})
+        Index: [3, 4, 0, 9, 7, 2, 8, 1, 5, 6]
+    """
     with torch.no_grad():
         tester = SLTester(model, hps.m)
-        print('XXXtester',tester)
         for i, (G, index) in enumerate(loader):
             G = G.to(hps.device)
-            print('XXXG-index',G,index)
-            raise Exception("Sorry, no numbers below zero")
             tester.evaluation(G, index, valset)
-
+    # Average validation loss
     running_avg_loss = tester.running_avg_loss
 
     if len(tester.hyps) == 0 or len(tester.refer) == 0:
         logger.error("During testing, no hyps is selected!")
         return
+    # Define Rouge measurement
     rouge = Rouge()
     scores_all = rouge.get_scores(tester.hyps, tester.refer, avg=True)
     logger.info('[INFO] End of valid | time: {:5.2f}s | valid loss {:5.4f} | '.format((time.time() - iter_start_time),
                                                                                       float(running_avg_loss)))
     log_score(scores_all=scores_all)
+    # Calculate metrics
     tester.getMetric()
+    # F1 score
     F = tester.labelMetric
-
+    # --------- Saving best model (find lower loss)  => Considering loss value ---------
+    """
+        1) non_descent_cnt: keep track of the number of epochs or iterations during the training process where the optimization algorithm
+        did not result in a decrease in the loss function.
+    """
     if best_loss is None or running_avg_loss < best_loss:
-        bestmodel_save_path = os.path.join(eval_dir, 'bestmodel_%d' % (
-                saveNo % 3))  # this is where checkpoints of best models are saved
+        # This is where checkpoints of best models are saved
+        bestmodel_save_path = os.path.join(eval_dir, 'bestmodel_%d' % (saveNo % 3))
+        # Best Loss != None
         if best_loss is not None:
             logger.info(
                 '[INFO] Found new best model with %.6f running_avg_loss. The original loss is %.6f, Saving to %s',
                 float(running_avg_loss), float(best_loss), bestmodel_save_path)
+        # Best Loss == None
         else:
             logger.info(
                 '[INFO] Found new best model with %.6f running_avg_loss. The original loss is None, Saving to %s',
                 float(running_avg_loss), bestmodel_save_path)
+        # Save and Update average loss value
         with open(bestmodel_save_path, 'wb') as f:
             torch.save(model.state_dict(), f)
         best_loss = running_avg_loss
         non_descent_cnt = 0
         saveNo += 1
+    # Increase the value of "non_descent_cnt" => Better model was not found.
     else:
         non_descent_cnt += 1
-
+    # --------- Find the best F1 score ---------
     if best_F is None or best_F < F:
-        bestmodel_save_path = os.path.join(eval_dir, 'bestFmodel')  # this is where checkpoints of best models are saved
+        # This is where checkpoints of best models are saved
+        bestmodel_save_path = os.path.join(eval_dir, 'bestFmodel')
+        # Best F1 score != None
         if best_F is not None:
             logger.info('[INFO] Found new best model with %.6f F. The original F is %.6f, Saving to %s', float(F),
                         float(best_F), bestmodel_save_path)
+        # Best F1 score == None
         else:
             logger.info('[INFO] Found new best model with %.6f F. The original F is None, Saving to %s', float(F),
                         bestmodel_save_path)
+        # Save model and Update the best F1 score value
         with open(bestmodel_save_path, 'wb') as f:
             torch.save(model.state_dict(), f)
         best_F = F
@@ -408,6 +435,7 @@ def main():
         train_loader = torch.utils.data.DataLoader(dataset, batch_size=hps.batch_size, shuffle=False, num_workers=2,
                                                    collate_fn=graph_collate_fn)
         del dataset
+        # --------- Validation Loader ---------
         valid_dataset = ExampleSet(VALID_FILE, vocab, hps.doc_max_timesteps, hps.sent_max_len, FILTER_WORD,
                                    val_w2s_path)
         valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=hps.batch_size, shuffle=False,

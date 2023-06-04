@@ -16,13 +16,6 @@ logger.setLevel(logging.DEBUG)
 
 
 def log_score(scores_all):
-    # res = "Rouge1:\n\tp:%.6f, r:%.6f, f:%.6f\n" % (
-    #     scores_all['rouge-1']['p'], scores_all['rouge-1']['r'], scores_all['rouge-1']['f']) \
-    #       + "Rouge2:\n\tp:%.6f, r:%.6f, f:%.6f\n" % (
-    #           scores_all['rouge-2']['p'], scores_all['rouge-2']['r'], scores_all['rouge-2']['f']) \
-    #       + "Rougel:\n\tp:%.6f, r:%.6f, f:%.6f\n" % (
-    #           scores_all['rouge-l']['p'], scores_all['rouge-l']['r'], scores_all['rouge-l']['f'])
-    #
     res = f"""
         ROUGE_1:
             p={scores_all['rouge-1']['p']}

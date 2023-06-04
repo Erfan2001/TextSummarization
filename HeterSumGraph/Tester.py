@@ -76,7 +76,8 @@ class TestPipLine():
     def extractLabel(self):
         return self.extracts
 
-    
+##############################################################################################
+
 class SLTester(TestPipLine):
     def __init__(self, model, m, test_dir=None, limited=False, blocking_win=3):
         super().__init__(model, m, test_dir, limited)
@@ -85,6 +86,19 @@ class SLTester(TestPipLine):
         self.criterion = torch.nn.CrossEntropyLoss(reduction='none')
         self.blocking_win = blocking_win
 
+    ######################################### *********** #########################################
+
+    """
+        This code defines a function for evaluating a specific model used for text summarization.
+        The function takes the model, dataset information, example IDs, and a flag for n-gram blocking as inputs.
+
+        In this function, the output of the model is computed for the input graph G, and the model error is
+        calculated using the specified loss function. Then, the error is stored for each node corresponding
+        to the output sentences. Finally, the predictions of the model are compared to the ground truth labels
+        using the specified parameters for the model, and the evaluation metrics are calculated and recorded.
+        These metrics include the number of correct predictions, the total number of predicted and actual summary
+        sentences, and the number of sentences that are correctly predicted and are present in the actual summary.
+    """
     def evaluation(self, G, index, dataset, blocking=False):
         """
             :param G: the model
@@ -142,19 +156,35 @@ class SLTester(TestPipLine):
             self._hyps.append(hyps)
             self._refer.append(refer)
 
+    ######################################### *********** #########################################
+    """
+        The code indicates that the function should calculate the accuracy, precision, recall, and F1 score
+        for the model, using the evaluation metrics that have been calculated and stored in the class variables.
+        Finally, it logs the evaluation results, including the total number of examples, the total number of
+        sentences, and the calculated accuracy, precision, recall, and F1 score, using the Python logging library.
+    """
     def getMetric(self):
         logger.info("[INFO] Validset match_true %d, pred %d, true %d, total %d, match %d",
                     self.match_true, self.pred, self.true, self.total_sentence_num, self.match)
+        # Calculate metrics based on data (Using *eval_label* function)
         self._accu, self._precision, self._recall, self._F = eval_label(
             self.match_true, self.pred, self.true, self.total_sentence_num, self.match)
         logger.info(
             "[INFO] The size of totalset is %d, sent_number is %d, accu is %f, precision is %f, recall is %f, F is %f",
             self.example_num, self.total_sentence_num, self._accu, self._precision, self._recall, self._F)
 
-
+    ######################################### *********** #########################################
+    """
+        The function first initializes an empty list to keep track of the n-grams that have been seen before.
+        Then, it sorts the predicted probabilities in descending order and iterates over each sentence to identify 
+        the n-grams in the sentence that have not been seen before. If an n-gram in a sentence has already 
+        been seen before, the function skips that sentence and moves on to the next one. If an n-gram has not 
+        been seen before, the function adds that sentence to the output and adds the n-grams from that sentence 
+        to the list of seen n-grams. The function continues this process until it has added the maximum number of 
+        sentences specified by the k parameter.
+    """
     def ngram_blocking(self, sents, p_sent, n_win, k):
         """
-        
         :param p_sent: [sent_num, 1]
         :param n_win: int, n_win=2,3,4...
         :return: 

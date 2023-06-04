@@ -12,6 +12,8 @@ from rouge import Rouge
 from .logger import *
 
 import sys
+
+# This limit prevents infinite recursion from causing an overflow of the C stack and crashing Python.
 sys.setrecursionlimit(10000)
 
 _ROUGE_PATH = "/remote-home/dqwang/ROUGE/RELEASE-1.5.5"
@@ -27,7 +29,8 @@ def clean(x):
     return re.sub( 
             r"-lrb-|-rrb-|-lcb-|-rcb-|-lsb-|-rsb-|``|''", 
             lambda m: REMAP.get(m.group()), x)
-
+            
+#################################### Calculate average of rouge scores ####################################
 def rouge_eval(hyps, refer):
     rouge = Rouge()
     try:
@@ -37,11 +40,20 @@ def rouge_eval(hyps, refer):
         mean_score = 0.0
     return mean_score
 
+#################################### Return all rouge scores ####################################
 def rouge_all(hyps, refer):
     rouge = Rouge()
     score = rouge.get_scores(hyps, refer)[0]
     return score
 
+#################################### Calculate all metrics ####################################
+"""
+    pred: True Positive + False Positive === (all predicted items)
+    true: True Positive + False Negative === (all actual labels)
+    match: All matched items === True Positive + False Negative
+    match_true: True Positive
+    total: All items
+"""
 def eval_label(match_true, pred, true, total, match):
     match_true, pred, true, match = match_true.float(), pred.float(), true.float(), match.float()
     try:
@@ -53,11 +65,11 @@ def eval_label(match_true, pred, true, total, match):
         accu, precision, recall, F = 0.0, 0.0, 0.0, 0.0
         logger.error("[Error] float division by zero")
     return accu, precision, recall, F
-
+##############################################################################################
 
 def pyrouge_score(hyps, refer, remap = True):
     return pyrouge_score_all([hyps], [refer], remap)
-    
+##############################################################################################
 def pyrouge_score_all(hyps_list, refer_list, remap = True):
     from pyrouge import Rouge155
     nowTime=datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -104,7 +116,7 @@ def pyrouge_score_all(hyps_list, refer_list, remap = True):
     scores['rouge-2']['p'], scores['rouge-2']['r'], scores['rouge-2']['f'] = output_dict['rouge_2_precision'], output_dict['rouge_2_recall'], output_dict['rouge_2_f_score']
     scores['rouge-l']['p'], scores['rouge-l']['r'], scores['rouge-l']['f'] = output_dict['rouge_l_precision'], output_dict['rouge_l_recall'], output_dict['rouge_l_f_score']
     return scores
-
+##############################################################################################
 
 def pyrouge_score_all_multi(hyps_list, refer_list, remap = True):
     from pyrouge import Rouge155
@@ -154,7 +166,7 @@ def pyrouge_score_all_multi(hyps_list, refer_list, remap = True):
     scores['rouge-2']['p'], scores['rouge-2']['r'], scores['rouge-2']['f'] = output_dict['rouge_2_precision'], output_dict['rouge_2_recall'], output_dict['rouge_2_f_score']
     scores['rouge-l']['p'], scores['rouge-l']['r'], scores['rouge-l']['f'] = output_dict['rouge_l_precision'], output_dict['rouge_l_recall'], output_dict['rouge_l_f_score']
     return scores
-
+##############################################################################################
 
 def cal_label(article, abstract):
     hyps_list = article
