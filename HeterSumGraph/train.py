@@ -309,8 +309,6 @@ def main():
             train_w2s_path: HeterSumGraph\cache\CNNDM\\train.w2s.tfidf.jsonl
         """
         dataset = ExampleSet(DATA_FILE, vocab, hps.doc_max_timesteps, hps.sent_max_len, FILTER_WORD, train_w2s_path)
-        print('ٍErfaaan')
-        raise Exception("Sorry, no numbers below zero")
         train_loader = torch.utils.data.DataLoader(dataset, batch_size=hps.batch_size, shuffle=False, num_workers=2,
                                                    collate_fn=graph_collate_fn)
         del dataset

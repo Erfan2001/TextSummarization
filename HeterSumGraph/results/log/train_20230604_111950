@@ -1,0 +1,8 @@
+2023-06-04 11:19:50,100 INFO    : Pytorch 2.0.0+cu117
+2023-06-04 11:19:50,101 INFO    : [INFO] Create Vocab, vocab path is HeterSumGraph\cache\CNNDM\vocab
+2023-06-04 11:19:50,208 INFO    : [INFO] max_size of vocab was specified as 50000; we now have 50000 words. Stopping reading.
+2023-06-04 11:19:50,234 INFO    : [INFO] Finished constructing vocabulary of 50000 total words. Last word added: chaudhary
+2023-06-04 11:19:50,235 INFO    : [INFO] Word Embedding Dimension is 300
+2023-06-04 11:19:50,381 INFO    : Namespace(data_dir='datasets\\cnndm', cache_dir='HeterSumGraph\\cache\\CNNDM', embedding_path='embeddings\\glove.42B.300d.txt', model='HSG', restore_model='None', save_root='HeterSumGraph\\results\\log', log_root='HeterSumGraph\\results\\log', seed=666, gpu='0', cuda=True, vocab_size=50000, n_epochs=2, batch_size=32, n_iter=1, word_embedding=False, word_emb_dim=300, embed_train=False, feat_embed_size=50, n_layers=1, lstm_hidden_state=128, lstm_layers=2, bidirectional=True, n_feature_size=128, hidden_size=64, ffn_inner_hidden_size=512, n_head=8, recurrent_dropout_prob=0.1, atten_dropout_prob=0.1, ffn_dropout_prob=0.1, use_orthnormal_init=True, sent_max_len=100, doc_max_timesteps=50, lr=0.0005, lr_descent=True, grad_clip=True, max_grad_norm=1.0, m=3)
+2023-06-04 11:19:51,567 INFO    : [INFO] Use cuda
+2023-06-04 11:19:57,504 INFO    : [MODEL] HeterSumGraph 

@@ -157,13 +157,13 @@ class ExampleSet(torch.utils.data.Dataset):
         self.sent_max_len = sent_max_len
         self.doc_max_timesteps = doc_max_timesteps
 
-        logger.info("[INFO] Start reading %s", self.__class__.__name__)
-        print('ٍErfaaan22')
-        raise Exception("Sorry, no numbers below zero")
         start = time.time()
         self.example_list = readJson(data_path)
         logger.info("[INFO] Finish reading %s. Total time is %f, Total size is %d", self.__class__.__name__,
                     time.time() - start, len(self.example_list))
+        logger.info("[INFO] Start reading %s", self.__class__.__name__)
+        print('ٍErfaaan22')
+        raise Exception("Sorry, no numbers below zero")
         self.size = len(self.example_list)
 
         logger.info("[INFO] Loading filter word File %s", filter_word_path)
@@ -459,6 +459,7 @@ def readJson(fname):
     data = []
     with open(fname, encoding="utf-8") as f:
         for line in f:
+            print('Ali',line)
             data.append(json.loads(line))
     return data
 
