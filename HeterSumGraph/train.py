@@ -15,6 +15,7 @@ from module.embedding import Word_Embedding
 from module.vocabulary import Vocab
 from tools.logger import *
 
+# Debug Flag
 _DEBUG_FLAG_ = False
 
 
@@ -34,21 +35,24 @@ def setup_training(model, train_loader, valid_loader, valset, hps):
         :param hps: hps for model
         :return: 
     """
-
+    # Path of Training model => HeterSumGraph\results\log\train
     train_dir = os.path.join(hps.save_root, "train")
+    # --------- Restoring Model (PreTrained Models) ---------
     if os.path.exists(train_dir) and hps.restore_model != 'None':
         logger.info("[INFO] Restoring %s for training...", hps.restore_model)
         bestmodel_file = os.path.join(train_dir, hps.restore_model)
         model.load_state_dict(torch.load(bestmodel_file))
         hps.save_root = hps.save_root + "_reload"
     else:
+        # --------- Creating New File for Model (If Not Exists) ---------
         logger.info("[INFO] Create new model for training...")
         if os.path.exists(train_dir):
             shutil.rmtree(train_dir)
         os.makedirs(train_dir)
-
+    # --------- Start Training ---------
     try:
         run_training(model, train_loader, valid_loader, valset, hps, train_dir)
+    # --------- Interrupt (Early Stop) ---------
     except KeyboardInterrupt:
         logger.error("[Error] Caught keyboard interrupt on worker. Stopping supervisor...")
         save_model(model, os.path.join(train_dir, "earlystop"))
@@ -67,8 +71,36 @@ def run_training(model, train_loader, valid_loader, valset, hps, train_dir):
     """
     logger.info("[INFO] Starting run_training")
 
+    # --------- Define Optimizer ---------
+    """
+        learning rate: 0.0005
+        Adam Optimizer: Extended version of stochastic gradient descent
+        Model Parameters (Example):
+            1) Data:
+                tensor([[ 0.0000,  0.0000,  0.0000,  ...,  0.0000,  0.0000,  0.0000],
+                [ 1.0435,  0.0049, -0.9158,  ..., -1.4600, -0.7835, -0.8562],
+                [ 0.0871, -0.6995,  0.6882,  ..., -0.0618,  1.2191, -1.2322],
+                ...,
+                [-0.5717, -1.1029,  0.3211,  ..., -0.0190, -0.2724, -1.3183],
+                [ 0.1839, -1.6656, -1.0831,  ...,  1.8187, -1.9443,  0.6668],
+                [-1.6763, -0.8578,  0.3160,  ..., -0.3354,  0.3789, -1.7529]],
+                device='cuda:0')
+            2) Shape: torch.Size([50000, 300])
+    """
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=hps.lr)
-
+    # --------- Loss Function ---------
+    # !!Explain: Cross entropy loss between input logits and target
+    """
+        Some Loss Functions:
+            1) Mean Absolute Error (L1 Loss Function | nn.L1Loss()): Sum of absolute differences between actual values and predicted values.
+            2) Mean Squared Error (MSE | nn.MSELoss()):  average of the squared differences between actual values and predicted values.
+            3) Negative Log-Likelihood(NLL | nn.NLLLoss()): for models with the softmax function as an output activation layer.
+            4) Cross-Entropy (CE | nn.CrossEntropyLoss()): difference between two probability distributions for a provided set of occurrences or random variables.
+            5) Hinge Embedding (HE | nn.HingeEmbeddingLoss()): Target values are between {1, -1}, which makes it good for binary classification tasks.
+            6) Margin Ranking (MR | nn.MarginRankingLoss()): computes a criterion to predict the relative distances between inputs.(predict directly from a given set of inputs)
+            7) Triplet Margin (TM | nn.TripletMarginLoss(margin=1.0, p=2)): computes a criterion for measuring the triplet loss in models.
+            8) Kullback-Leibler Divergence (KL | nn.KLDivLoss(reduction = 'batchmean')): compute the amount of lost information (expressed in bits) in case the predicted probability distribution is utilized to estimate the expected target probability distribution.
+    """
     criterion = torch.nn.CrossEntropyLoss(reduction='none')
 
     best_train_loss = None
@@ -77,42 +109,99 @@ def run_training(model, train_loader, valid_loader, valset, hps, train_dir):
     non_descent_cnt = 0
     saveNo = 0
 
+    # --------- Start Training Epoch ---------
     for epoch in range(1, hps.n_epochs + 1):
         epoch_loss = 0.0
         train_loss = 0.0
         epoch_start_time = time.time()
+        # --------- Start Training Iterator ---------
+        """
+            Graph(Example):
+                Graph(num_nodes=3989, num_edges=52494,
+                    ndata_schemes={
+                        'unit': Scheme(shape=(), dtype=torch.float32), 
+                        'id': Scheme(shape=(), dtype=torch.int64), 
+                        'dtype': Scheme(shape=(), dtype=torch.float32), 
+                        'words': Scheme(shape=(100,), dtype=torch.int64), 
+                        'position': Scheme(shape=(1,), dtype=torch.int64), 
+                        'label': Scheme(shape=(50,), dtype=torch.int64)}
+                    edata_schemes={
+                        'tffrac': Scheme(shape=(), dtype=torch.int64), 
+                        'dtype': Scheme(shape=(), dtype=torch.float32)
+                                  })
+            index(Example):
+                [10, 9, 11, 12, 5, 7, 3, 2, 4, 8, 13, 6, 14, 1, 0, 15]
+            outputs(Example):
+             1) Data: 
+                tensor([[ 2.9612e-01,  3.6615e-01],
+                        [ 3.4196e-01,  2.6532e-01],
+                        [ 2.1960e-01, -1.5018e-01],
+                        [ 2.0823e-01, -3.4699e-02],
+                        [ 3.6691e-01, -2.8408e-01],
+                        [ 1.3301e-02, -2.6481e-01],
+                        [ 1.3135e-01,  3.5627e-02],
+                        ...
+                        [ 9.4292e-01,  3.4942e-01],
+                        [ 9.7441e-01, -2.1102e-01],
+                        [ 8.1181e-01, -6.9850e-01],
+                        [ 1.0028e+00, -1.1024e-01]], 
+                device='cuda:0', grad_fn=<AddmmBackward0>)
+            2) Size:
+                torch.Size([551, 2]) 
+        """
         for i, (G, index) in enumerate(train_loader):
             iter_start_time = time.time()
-
             model.train()
-
+            # Save Model to GPU/CPU
             G = G.to(hps.device)
-            outputs = model.forward(G)  # [n_snodes, 2]
+            # Forward Section of Model
+            # !!Explain: [n_snodes, 2]
+            outputs = model.forward(G)
+            # Separate Node Ids => Size(torch.Size([551]))
             snode_id = G.filter_nodes(lambda nodes: nodes.data["dtype"] == 1)
-            label = G.ndata["label"][snode_id].sum(-1)  # [n_nodes]
-            G.nodes[snode_id].data["loss"] = criterion(outputs, label.to(hps.device)).unsqueeze(-1)  # [n_nodes, 1]
-            loss = dgl.sum_nodes(G, "loss")  # [batch_size, 1]
+            # All labels of nodes (n_nodes)
+            label = G.ndata["label"][snode_id].sum(-1)
+            # Calculate loss function for each node
+            # !!Explain: [n_nodes, 1] 
+            """
+                Example: 
+                tensor([[0.7288],
+                        [0.6556],
+                        [0.5253],
+                        [0.5790],
+                        [0.4197],
+                        [0.5637],
+                        [0.6464],
+                , device='cuda:0', grad_fn=<IndexSelectBackward0>)
+                Size: torch.Size([551, 1])
+            """
+            G.nodes[snode_id].data["loss"] = criterion(outputs, label.to(hps.device)).unsqueeze(-1)
+            # Sums all the values of node field feature in graph
+            # !!Explain: [batch_size, 1]
+            loss = dgl.sum_nodes(G, "loss")
             loss = loss.mean()
-
+            # If loss values is infinite
             if not (np.isfinite(loss.data.cpu())).numpy():
                 logger.error("train Loss is not finite. Stopping.")
                 logger.info(loss)
                 for name, param in model.named_parameters():
                     if param.requires_grad:
                         logger.info(name)
-                        # logger.info(param.grad.data.sum())
                 raise Exception("train Loss is not finite. Stopping.")
-
+            # Zero all the gradients of the variable (it will update the learnable weights of the model.)
             optimizer.zero_grad()
+            # Backward Section of Model
+            # !!Explain: Backward tensor(18.4536, device='cuda:0', grad_fn=<MeanBackward0>)
             loss.backward()
+            #  Gradient Clipping (Mitigate the problem of exploding gradients)
             if hps.grad_clip:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), hps.max_grad_norm)
-
+            # Update based on the current gradient
             optimizer.step()
-
+            # Calculate train and epoch loss
             train_loss += float(loss.data)
             epoch_loss += float(loss.data)
-
+            # Show values every 100 iterations
             if i % 100 == 0:
                 if _DEBUG_FLAG_:
                     for name, param in model.named_parameters():
@@ -122,31 +211,32 @@ def run_training(model, train_loader, valid_loader, valset, hps, train_dir):
                 logger.info('       | end of iter {:3d} | time: {:5.2f}s | train loss {:5.4f} | '
                             .format(i, (time.time() - iter_start_time), float(train_loss / 100)))
                 train_loss = 0.0
-
+        # Descent learning rate (Update!!!)
         if hps.lr_descent:
             new_lr = max(5e-6, hps.lr / (epoch + 1))
             for param_group in list(optimizer.param_groups):
                 param_group['lr'] = new_lr
             logger.info("[INFO] The learning rate now is %f", new_lr)
-
+        # Average loss of each epoch
         epoch_avg_loss = epoch_loss / len(train_loader)
         logger.info('   | end of epoch {:3d} | time: {:5.2f}s | epoch train loss {:5.4f} | '
                     .format(epoch, (time.time() - epoch_start_time), float(epoch_avg_loss)))
-
+        # Save Best Model (Based on Average Loss of epoch)
         if not best_train_loss or epoch_avg_loss < best_train_loss:
             save_file = os.path.join(train_dir, "bestmodel")
             logger.info('[INFO] Found new best model with %.3f running_train_loss. Saving to %s', float(epoch_avg_loss),
                         save_file)
             save_model(model, save_file)
             best_train_loss = epoch_avg_loss
+        # If training loss does not decrease(1 time) => stop running and save current model
         elif epoch_avg_loss >= best_train_loss:
             logger.error("[Error] training loss does not descent. Stopping supervisor...")
             save_model(model, os.path.join(train_dir, "earlystop"))
             sys.exit(1)
-
+        # --------- Start Evaluation Iterator ---------
         best_loss, best_F, non_descent_cnt, saveNo = run_eval(model, valid_loader, valset, hps, best_loss, best_F,
                                                               non_descent_cnt, saveNo)
-
+        # If evaluation loss does not stop(3 times) => stop running and save current model
         if non_descent_cnt >= 3:
             logger.error("[Error] val loss does not descent for three times. Stopping supervisor...")
             save_model(model, os.path.join(train_dir, "earlystop"))
@@ -168,19 +258,22 @@ def run_eval(model, loader, valset, hps, best_loss, best_F, non_descent_cnt, sav
         :return:
     """
     logger.info("[INFO] Starting eval for this model ...")
-    eval_dir = os.path.join(hps.save_root, "eval")  # make a subdir of the root dir for eval data
+    # Make a subdir of the root dir for eval data
+    eval_dir = os.path.join(hps.save_root, "eval")
     if not os.path.exists(eval_dir):
         os.makedirs(eval_dir)
-
+    # Change to evaluation mode
     model.eval()
 
     iter_start_time = time.time()
 
     with torch.no_grad():
         tester = SLTester(model, hps.m)
+        print('XXXtester',tester)
         for i, (G, index) in enumerate(loader):
             G = G.to(hps.device)
-
+            print('XXXG-index',G,index)
+            raise Exception("Sorry, no numbers below zero")
             tester.evaluation(G, index, valset)
 
     running_avg_loss = tester.running_avg_loss
@@ -293,11 +386,12 @@ def main():
         logger.info("[INFO] Use CPU")
     hps.device = device
 
-    # --------- HSG(Heterogeneous Service Graph) Model ---------
+    # --------- HSG(Heterogeneous Summarization Graph) Model => Single Document ---------
     if hps.model == "HSG":
         # Define Model
         model = HSumGraph(hps, embed)
         logger.info("[MODEL] HeterSumGraph ")
+        # --------- Make Dataset ---------
         """
             DATA_FILE: datasets\cnndm\\train.label.jsonl (Size = 287084)
             vocab: <module.vocabulary.Vocab object at 0x0000028B63BCFFA0
@@ -309,6 +403,8 @@ def main():
             train_w2s_path: HeterSumGraph\cache\CNNDM\\train.w2s.tfidf.jsonl
         """
         dataset = ExampleSet(DATA_FILE, vocab, hps.doc_max_timesteps, hps.sent_max_len, FILTER_WORD, train_w2s_path)
+        # --------- Train Loader ---------
+        # !!Explain: collate_fn(resize to a uniform size and combine them into a single Tensor input for the neural network)
         train_loader = torch.utils.data.DataLoader(dataset, batch_size=hps.batch_size, shuffle=False, num_workers=2,
                                                    collate_fn=graph_collate_fn)
         del dataset
@@ -316,7 +412,7 @@ def main():
                                    val_w2s_path)
         valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=hps.batch_size, shuffle=False,
                                                    collate_fn=graph_collate_fn, num_workers=32)
-    # --------- HDSG(Hetero-dielectric single gate) Model ---------
+    # --------- HDSG(Heterogeneous Documents Summarization Graph) Model => Multiple Documents ---------
     elif hps.model == "HDSG":
         # Define Model
         model = HSumDocGraph(hps, embed)
@@ -337,6 +433,7 @@ def main():
         logger.error("[ERROR] Invalid Model Type!")
         raise NotImplementedError("Model Type has not been implemented")
 
+    # --------- Start Training ---------
     setup_training(model, train_loader, valid_loader, valid_dataset, hps)
 
 

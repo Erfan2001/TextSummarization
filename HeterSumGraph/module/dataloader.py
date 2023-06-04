@@ -108,6 +108,7 @@ class Example(object):
                 article_words.extend([pad_id] * (max_len - len(article_words)))
             self.enc_sent_input_pad.append(article_words)
 
+##############################################################################################
 
 class Example2(Example):
     """Class representing a train/val/test example for multi-document extractive summarization."""
@@ -137,7 +138,7 @@ class Example2(Example):
             cur += docLen
 
 
-######################################### ExampleSet #########################################
+############################### ExampleSet (for single document summarization) ###############################
 
 class ExampleSet(torch.utils.data.Dataset):
     """ Constructor: Dataset of example(object) for single document summarization"""
@@ -159,38 +160,43 @@ class ExampleSet(torch.utils.data.Dataset):
 
         start = time.time()
         self.example_list = readJson(data_path)
+        # --------- Reading Train Data ---------
         logger.info("[INFO] Finish reading %s. Total time is %f, Total size is %d", self.__class__.__name__,
                     time.time() - start, len(self.example_list))
         logger.info("[INFO] Start reading %s", self.__class__.__name__)
-        print('ٍErfaaan22')
-        raise Exception("Sorry, no numbers below zero")
         self.size = len(self.example_list)
-
+        # --------- Reading Filter words ---------
         logger.info("[INFO] Loading filter word File %s", filter_word_path)
         tfidf_w = readText(filter_word_path)
+        # --------- All StopWords except Punctuations ---------
         self.filterwords = FILTERWORD
+        # --------- Find Ids of StopWords ---------
         self.filterids = [vocab.word2id(w.lower()) for w in FILTERWORD]
+        # --------- Unknown & Padding ---------
+        # !!Explain: "[UNK]" (unknown) should be kept && "[PAD]" (padding) should be removed.
         self.filterids.append(vocab.word2id("[PAD]"))   # keep "[UNK]" but remove "[PAD]"
         lowtfidf_num = 0
-        pattern = r"^[0-9]+$"
+        # --------- Add Filter words in the file to local variables(filterwords & filterids) ---------
         for w in tfidf_w:
             if vocab.word2id(w) != vocab.word2id('[UNK]'):
                 self.filterwords.append(w)
                 self.filterids.append(vocab.word2id(w))
-                # if re.search(pattern, w) == None:  # if w is a number, it will not increase the lowtfidf_num
-                    # lowtfidf_num += 1
                 lowtfidf_num += 1
             if lowtfidf_num > 5000:
                 break
-
+        # --------- Words to Sentences TFIDF file ---------
         logger.info("[INFO] Loading word2sent TFIDF file from %s!" % w2s_path)
         self.w2s_tfidf = readJson(w2s_path)
+
+    ######################################### *********** #########################################
 
     def get_example(self, index):
         e = self.example_list[index]
         e["summary"] = e.setdefault("summary", [])
         example = Example(e["text"], e["summary"], self.vocab, self.sent_max_len, e["label"])
         return example
+
+    ######################################### *********** #########################################
 
     def pad_label_m(self, label_matrix):
         label_m = label_matrix[:self.doc_max_timesteps, :self.doc_max_timesteps]
@@ -199,6 +205,8 @@ class ExampleSet(torch.utils.data.Dataset):
             pad_m = np.zeros((N, self.doc_max_timesteps - m))
             return np.hstack([label_m, pad_m])
         return label_m
+
+    ######################################### *********** #########################################
 
     def AddWordNode(self, G, inputid):
         wid2nid = {}
@@ -221,6 +229,8 @@ class ExampleSet(torch.utils.data.Dataset):
 
         return wid2nid, nid2wid
 
+    ######################################### *********** #########################################
+
     def CreateGraph(self, input_pad, label, w2s_w):
         """ Create a graph for each document
         
@@ -237,7 +247,6 @@ class ExampleSet(torch.utils.data.Dataset):
         G = dgl.DGLGraph()
         wid2nid, nid2wid = self.AddWordNode(G, input_pad)
         w_nodes = len(nid2wid)
-
         N = len(input_pad)
         G.add_nodes(N)
         G.ndata["unit"][w_nodes:] = torch.ones(N)
@@ -269,6 +278,8 @@ class ExampleSet(torch.utils.data.Dataset):
 
         return G
 
+    ######################################### *********** #########################################
+
     def __getitem__(self, index):
         """
         :param index: int; the index of the example
@@ -287,6 +298,7 @@ class ExampleSet(torch.utils.data.Dataset):
     def __len__(self):
         return self.size
 
+############################### ExampleSet (for multiple document summarization) ###############################
 
 class MultiExampleSet(ExampleSet):
     """ Constructor: Dataset of example(object) for multiple document summarization"""
@@ -307,11 +319,15 @@ class MultiExampleSet(ExampleSet):
         logger.info("[INFO] Loading word2doc TFIDF file from %s!" % w2d_path)
         self.w2d_tfidf = readJson(w2d_path)
 
+    ######################################### *********** #########################################
+
     def get_example(self, index):
         e = self.example_list[index]
         e["summary"] = e.setdefault("summary", [])
         example = Example2(e["text"], e["summary"], self.vocab, self.sent_max_len, e["label"])
         return example
+
+    ######################################### *********** #########################################
 
     def MapSent2Doc(self, article_len, sentNum):
         sent2doc = {}
@@ -326,6 +342,8 @@ class MultiExampleSet(ExampleSet):
                 if sentNo >= sentNum:
                     return sent2doc
         return sent2doc
+
+    ######################################### *********** #########################################
 
     def CreateGraph(self, docLen, sent_pad, doc_pad, label, w2s_w, w2d_w):
         """ Create a graph for each document
@@ -406,6 +424,8 @@ class MultiExampleSet(ExampleSet):
         G.nodes[sentid2nid].data["label"] = torch.LongTensor(label)  # [N, doc_max]
 
         return G
+    
+    ######################################### *********** #########################################
 
     def __getitem__(self, index):
         """
@@ -424,6 +444,7 @@ class MultiExampleSet(ExampleSet):
 
         return G, index
 
+##############################################################################################
 
 class LoadHiExampleSet(torch.utils.data.Dataset):
     def __init__(self, data_root):
@@ -459,7 +480,6 @@ def readJson(fname):
     data = []
     with open(fname, encoding="utf-8") as f:
         for line in f:
-            print('Ali',line)
             data.append(json.loads(line))
     return data
 
