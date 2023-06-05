@@ -41,20 +41,26 @@ class Vocab(object):
         self._count = 0 # keeps track of total number of words in the Vocab
 
         # [UNK], [PAD], [START] and [STOP] get the ids 0,1,2,3.
+        """
+            Word   Id
+           [UNK] => 0 
+           [PAD] => 1
+           [START] => 2
+           [STOP] => 3
+        """
         for w in [PAD_TOKEN, UNKNOWN_TOKEN,  START_DECODING, STOP_DECODING]:
             self._word_to_id[w] = self._count
             self._id_to_word[self._count] = w
             self._count += 1
 
         # Read the vocab file and add words up to max_size
-        with open(vocab_file, 'r', encoding='utf8') as vocab_f: #New : add the utf8 encoding to prevent error
+        # !!Explain: Map number (5 and later) to each vocab
+        with open(vocab_file, 'r', encoding='utf8') as vocab_f:
             cnt = 0
             for line in vocab_f:
                 cnt += 1
                 pieces = line.split("\t")
-                # pieces = line.split()
                 w = pieces[0]
-                # print(w)
                 if w in [UNKNOWN_TOKEN, PAD_TOKEN, START_DECODING, STOP_DECODING]:
                     raise Exception('[UNK], [PAD], [START] and [STOP] shouldn\'t be in the vocab file, but %s is' % w)
                 if w in self._word_to_id:
@@ -68,22 +74,26 @@ class Vocab(object):
                     break
         logger.info("[INFO] Finished constructing vocabulary of %i total words. Last word added: %s", self._count, self._id_to_word[self._count-1])
 
+    ######################################### *********** #########################################
     def word2id(self, word):
         """Returns the id (integer) of a word (string). Returns [UNK] id if word is OOV."""
         if word not in self._word_to_id:
             return self._word_to_id[UNKNOWN_TOKEN]
         return self._word_to_id[word]
 
+    ######################################### *********** #########################################
     def id2word(self, word_id):
         """Returns the word (string) corresponding to an id (integer)."""
         if word_id not in self._id_to_word:
             raise ValueError('Id not found in vocab: %d' % word_id)
         return self._id_to_word[word_id]
 
+    ######################################### *********** #########################################
     def size(self):
         """Returns the total size of the vocabulary"""
         return self._count
 
+    ######################################### *********** #########################################
     def word_list(self):
         """Return the word list of the vocabulary"""
         return self._word_to_id.keys()

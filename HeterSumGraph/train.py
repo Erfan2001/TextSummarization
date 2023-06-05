@@ -26,6 +26,7 @@ def save_model(model, save_file):
 
 
 def setup_training(model, train_loader, valid_loader, valset, hps):
+    #region
     """ Does setup before starting training (run_training)
     
         :param model: the model
@@ -56,9 +57,10 @@ def setup_training(model, train_loader, valid_loader, valset, hps):
     except KeyboardInterrupt:
         logger.error("[Error] Caught keyboard interrupt on worker. Stopping supervisor...")
         save_model(model, os.path.join(train_dir, "earlystop"))
-
+    #endregion
 
 def run_training(model, train_loader, valid_loader, valset, hps, train_dir):
+    #region
     """  Repeatedly runs training iterations, logging loss to screen and log files
 
         :param model: the model
@@ -241,9 +243,10 @@ def run_training(model, train_loader, valid_loader, valset, hps, train_dir):
             logger.error("[Error] val loss does not descent for three times. Stopping supervisor...")
             save_model(model, os.path.join(train_dir, "earlystop"))
             return
-
+    #endregion
 
 def run_eval(model, loader, valset, hps, best_loss, best_F, non_descent_cnt, saveNo):
+    #region
     """
         Repeatedly runs eval iterations, logging to screen and writing summaries. Saves the model with the best loss
         seen so far.
@@ -348,7 +351,7 @@ def run_eval(model, loader, valset, hps, best_loss, best_F, non_descent_cnt, sav
         best_F = F
 
     return best_loss, best_F, non_descent_cnt, saveNo
-
+    #endregion
 
 def main():
     args = pars_args()
@@ -396,7 +399,6 @@ def main():
         pretrained_weight = embed_loader.add_unknown_words_by_avg(vectors, args.word_emb_dim)
         embed.weight.data.copy_(torch.Tensor(pretrained_weight))
         embed.weight.requires_grad = args.embed_train
-
     hps = args
     logger.info(hps)
 
